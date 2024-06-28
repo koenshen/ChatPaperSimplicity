@@ -1,13 +1,12 @@
 import argparse
 import base64
-import configparser
 import datetime
 import io
 import json
 import os
 import re
 from collections import namedtuple
-
+import time
 # import arxiv
 import fitz
 import numpy as np
@@ -19,7 +18,6 @@ import tiktoken
 from bs4 import BeautifulSoup
 from PIL import Image
 import sys
-
 
 ArxivParams = namedtuple(
     "ArxivParams",
@@ -39,7 +37,7 @@ ArxivParams = namedtuple(
 
 class Paper:
     def __init__(self, path, title='', url='', abs='', authers=[]):
-        # 初始化函数，根据pdf路径初始化Paper对象                
+        # 初始化函数，根据pdf路径初始化Paper对象
         self.url = url  # 文章链接
         self.path = path  # pdf路径
         self.section_names = []  # 段落标题
@@ -59,7 +57,7 @@ class Paper:
         self.text_list = [page.get_text() for page in self.pdf]
         self.all_text = ' '.join(self.text_list)
         self.section_page_dict = self._get_all_page_index()  # 段落与页码的对应字典
-        print("section_page_dict", self.section_page_dict)
+        # print("section_page_dict", self.section_page_dict)
         self.section_text_dict = self._get_all_page()  # 段落与内容的对应字典
         self.section_text_dict.update({"title": self.title})
         self.section_text_dict.update({"paper_info": self.get_paper_info()})
@@ -186,9 +184,9 @@ class Paper:
                         font_size = block["lines"][0]["spans"][0]["size"]  # 获取第一行第一段文字的字体大小
                         # print(font_size)
                         if abs(font_size - max_font_sizes[-1]) < 0.3 or abs(font_size - max_font_sizes[-2]) < 0.3:
-                            # print("The string is bold.", max_string, "font_size:", font_size, "font_flags:", font_flags)                            
+                            # print("The string is bold.", max_string, "font_size:", font_size, "font_flags:", font_flags)
                             if len(cur_string) > 4 and "arXiv" not in cur_string:
-                                # print("The string is bold.", max_string, "font_size:", font_size, "font_flags:", font_flags) 
+                                # print("The string is bold.", max_string, "font_size:", font_size, "font_flags:", font_flags)
                                 if cur_title == '':
                                     cur_title += cur_string
                                 else:
@@ -250,7 +248,7 @@ class Paper:
         # 再处理其他章节：
         text_list = [page.get_text() for page in self.pdf]
         for sec_index, sec_name in enumerate(self.section_page_dict):
-            print(sec_index, sec_name, self.section_page_dict[sec_name])
+            # print(sec_index, sec_name, self.section_page_dict[sec_name])
             if sec_index <= 0 and self.abs:
                 continue
             else:
@@ -260,7 +258,7 @@ class Paper:
                     end_page = self.section_page_dict[list(self.section_page_dict.keys())[sec_index + 1]]
                 else:
                     end_page = len(text_list)
-                print("start_page, end_page:", start_page, end_page)
+                # print("start_page, end_page:", start_page, end_page)
                 cur_sec_text = ''
                 if end_page - start_page == 0:
                     if sec_index < len(list(self.section_page_dict.keys())) - 1:
@@ -303,7 +301,7 @@ class Reader:
     def __init__(self, key_word, query,
                  root_path='./',
                  gitee_key='',
-                 sort=None, 
+                 sort=None,
                  user_name='defualt', args=None):
         self.user_name = user_name  # 读者姓名
         self.key_word = key_word  # 读者感兴趣的关键词
@@ -317,24 +315,18 @@ class Reader:
         else:
             self.language = 'Chinese'
         self.root_path = root_path
-        # 创建一个ConfigParser对象
-        self.config = configparser.ConfigParser()
-        # 读取配置文件
-        self.config.read('apikey.ini')
-        OPENAI_KEY = os.environ.get("OPENAI_KEY", "")
+
+        OPENAI_KEY = '4'
         # 获取某个键对应的值
-        openai.api_base = self.config.get('OpenAI', 'OPENAI_API_BASE')    
-        self.chat_api_list = self.config.get('OpenAI', 'OPENAI_API_KEYS')[1:-1].replace('\'', '').split(',')
+        openai.api_base = '3'
+        self.chat_api_list = ['1', '2']
         self.chat_api_list.append(OPENAI_KEY)
 
         # prevent short strings from being incorrectly used as API keys.
         self.chat_api_list = [api.strip() for api in self.chat_api_list if len(api) > 20]
         self.cur_api = 0
         self.file_format = args.file_format
-        if args.save_image:
-            self.gitee_key = self.config.get('Gitee', 'api')
-        else:
-            self.gitee_key = ''
+        self.gitee_key = ''
         self.max_token_num = 4096
         self.encoding = tiktoken.get_encoding("gpt2")
 
@@ -366,8 +358,8 @@ class Reader:
         for article in articles:
             try:
                 title = article.find("p", class_="title").text  # 找到每篇论文的标题，并去掉多余的空格和换行符
-                title = title.strip()            
-                link = article.find("span").find_all("a")[0].get('href')            
+                title = title.strip()
+                link = article.find("span").find_all("a")[0].get('href')
                 date_text = article.find("p", class_="is-size-7").text
                 date_text = date_text.split('\n')[0].split("Submitted ")[-1].split("; ")[0]
                 date_text = datetime.datetime.strptime(date_text, "%d %B, %Y").date()
@@ -381,8 +373,8 @@ class Reader:
                 print("error_title:", title)
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                print(exc_type, fname, exc_tb.tb_lineno)          
-                
+                print(exc_type, fname, exc_tb.tb_lineno)
+
         return titles, links, dates
 
     # 定义一个函数，根据关键词获取所有可用的论文标题，并打印出来
@@ -445,6 +437,7 @@ class Reader:
     def summary_with_chat(self, paper_list):
         htmls = []
         for paper_index, paper in enumerate(paper_list):
+            print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
             # 第一步先用title，abs，和introduction进行总结。
             text = ''
             text += 'Title:' + paper.title
@@ -460,7 +453,7 @@ class Reader:
                 print("summary_error:", e)
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                print(exc_type, fname, exc_tb.tb_lineno)          
+                print(exc_type, fname, exc_tb.tb_lineno)
                 if "maximum context" in str(e):
                     current_tokens_index = str(e).find("your messages resulted in") + len(
                         "your messages resulted in") + 1
@@ -469,7 +462,7 @@ class Reader:
                     chat_summary_text = self.chat_summary(text=text, summary_prompt_token=summary_prompt_token)
 
             htmls.append('## Paper:' + str(paper_index + 1))
-            htmls.append('\n\n\n')            
+            htmls.append('\n\n\n')
             if "chat_summary_text" in locals():
                 htmls.append(chat_summary_text)
 
@@ -480,14 +473,14 @@ class Reader:
                 if 'method' in parse_key.lower() or 'approach' in parse_key.lower():
                     method_key = parse_key
                     break
-            
+
             chat_method_text = ""
             if method_key != '':
                 text = ''
                 method_text = ''
                 summary_text = ''
                 summary_text += "<summary>" + chat_summary_text
-                # methods                
+                # methods
                 method_text += paper.section_text_dict[method_key]
                 text = summary_text + "\n\n<Methods>:\n\n" + method_text
                 # chat_method_text = self.chat_method(text=text)
@@ -497,14 +490,14 @@ class Reader:
                     print("method_error:", e)
                     exc_type, exc_obj, exc_tb = sys.exc_info()
                     fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                    print(exc_type, fname, exc_tb.tb_lineno)          
+                    print(exc_type, fname, exc_tb.tb_lineno)
                     if "maximum context" in str(e):
                         current_tokens_index = str(e).find("your messages resulted in") + len(
                             "your messages resulted in") + 1
                         offset = int(str(e)[current_tokens_index:current_tokens_index + 4])
                         method_prompt_token = offset + 800 + 150
                         chat_method_text = self.chat_method(text=text, method_prompt_token=method_prompt_token)
-                
+
                 if "chat_method_text" in locals():
                     htmls.append(chat_method_text)
                 # htmls.append(chat_method_text)
@@ -525,26 +518,25 @@ class Reader:
             summary_text += "<summary>" + chat_summary_text + "\n <Method summary>:\n" + chat_method_text
             chat_conclusion_text = ""
             if conclusion_key != '':
-                # conclusion                
+                # conclusion
                 conclusion_text += paper.section_text_dict[conclusion_key]
                 text = summary_text + "\n\n<Conclusion>:\n\n" + conclusion_text
             else:
                 text = summary_text
-            # chat_conclusion_text = self.chat_conclusion(text=text)
             try:
                 chat_conclusion_text = self.chat_conclusion(text=text)
             except Exception as e:
                 print("conclusion_error:", e)
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                print(exc_type, fname, exc_tb.tb_lineno)  
+                print(exc_type, fname, exc_tb.tb_lineno)
                 if "maximum context" in str(e):
                     current_tokens_index = str(e).find("your messages resulted in") + len(
                         "your messages resulted in") + 1
                     offset = int(str(e)[current_tokens_index:current_tokens_index + 4])
                     conclusion_prompt_token = offset + 800 + 150
                     chat_conclusion_text = self.chat_conclusion(text=text,
-                                                                conclusion_prompt_token=conclusion_prompt_token)            
+                                                                conclusion_prompt_token=conclusion_prompt_token)
             if "chat_conclusion_text" in locals():
                 htmls.append(chat_conclusion_text)
             htmls.append("\n" * 4)
@@ -564,7 +556,7 @@ class Reader:
                     stop=tenacity.stop_after_attempt(5),
                     reraise=True)
     def chat_conclusion(self, text, conclusion_prompt_token=800):
-        openai.api_key = self.chat_api_list[self.cur_api]
+        openai.api_key = '5'
         self.cur_api += 1
         self.cur_api = 0 if self.cur_api >= len(self.chat_api_list) - 1 else self.cur_api
         text_token = len(self.encoding.encode(text))
@@ -584,33 +576,22 @@ class Reader:
                     - (2):Summarize the strengths and weaknesses of this article in three dimensions: innovation point, performance, and workload.                   
                     .......
                  Follow the format of the output later: 
-                 8. Conclusion: \n\n
-                    - (1):xxx;\n                     
-                    - (2):Innovation point: xxx; Performance: xxx; Workload: xxx;\n                      
-                 
+                 8. Conclusion: 
+                    - (1):xxx;                   
+                    - (2):Innovation point: xxx; Performance: xxx; Workload: xxx;                 
+
                  Be sure to use {} answers (proper nouns need to be marked in English), statements as concise and academic as possible, do not repeat the content of the previous <summary>, the value of the use of the original numbers, be sure to strictly follow the format, the corresponding content output to xxx, in accordance with \n line feed, ....... means fill in according to the actual requirements, if not, you can not write.                 
                  """.format(self.language, self.language)},
         ]
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            # prompt需要用英语替换，少占用token。
-            messages=messages,
-        )
-        result = ''
-        for choice in response.choices:
-            result += choice.message.content
-        print("conclusion_result:\n", result)
-        print("prompt_token_used:", response.usage.prompt_tokens,
-              "completion_token_used:", response.usage.completion_tokens,
-              "total_token_used:", response.usage.total_tokens)
-        print("response_time:", response.response_ms / 1000.0, 's')
+        result, appendix = call_api(messages)
+        print(f"三、论文结论({appendix}):\n", result)
         return result
 
     @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
                     stop=tenacity.stop_after_attempt(5),
                     reraise=True)
     def chat_method(self, text, method_prompt_token=800):
-        openai.api_key = self.chat_api_list[self.cur_api]
+        openai.api_key = '6'
         self.cur_api += 1
         self.cur_api = 0 if self.cur_api >= len(self.chat_api_list) - 1 else self.cur_api
         text_token = len(self.encoding.encode(text))
@@ -630,34 +611,24 @@ class Reader:
                     - (3):...
                     - .......
                  Follow the format of the output that follows: 
-                 7. Methods: \n\n
-                    - (1):xxx;\n 
-                    - (2):xxx;\n 
-                    - (3):xxx;\n  
-                    ....... \n\n     
-                 
+                 7. Methods: 
+                    - (1):xxx;
+                    - (2):xxx;
+                    - (3):xxx; 
+                    .......   
+
                  Be sure to use {} answers (proper nouns need to be marked in English), statements as concise and academic as possible, do not repeat the content of the previous <summary>, the value of the use of the original numbers, be sure to strictly follow the format, the corresponding content output to xxx, in accordance with \n line feed, ....... means fill in according to the actual requirements, if not, you can not write.                 
                  """.format(self.language, self.language)},
         ]
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-        )
-        result = ''
-        for choice in response.choices:
-            result += choice.message.content
-        print("method_result:\n", result)
-        print("prompt_token_used:", response.usage.prompt_tokens,
-              "completion_token_used:", response.usage.completion_tokens,
-              "total_token_used:", response.usage.total_tokens)
-        print("response_time:", response.response_ms / 1000.0, 's')
+        result, appendix = call_api(messages)
+        print(f"二、论文方法({appendix}):\n", result)
         return result
 
     @tenacity.retry(wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
                     stop=tenacity.stop_after_attempt(5),
                     reraise=True)
     def chat_summary(self, text, summary_prompt_token=1100):
-        openai.api_key = self.chat_api_list[self.cur_api]
+        openai.api_key = '7'
         self.cur_api += 1
         self.cur_api = 0 if self.cur_api >= len(self.chat_api_list) - 1 else self.cur_api
         text_token = len(self.encoding.encode(text))
@@ -680,33 +651,23 @@ class Reader:
                     - (3):What is the research methodology proposed in this paper?
                     - (4):On what task and what performance is achieved by the methods in this paper? Can the performance support their goals?
                  Follow the format of the output that follows:                  
-                 1. Title: xxx\n\n
-                 2. Authors: xxx\n\n
-                 3. Affiliation: xxx\n\n                 
-                 4. Keywords: xxx\n\n   
-                 5. Urls: xxx or xxx , xxx \n\n      
-                 6. Summary: \n\n
-                    - (1):xxx;\n 
-                    - (2):xxx;\n 
-                    - (3):xxx;\n  
-                    - (4):xxx.\n\n     
-                 
+                 1. Title: xxx
+                 2. Authors: xxx
+                 3. Affiliation: xxx
+                 4. Keywords: xxx
+                 5. Urls: xxx or xxx , xxx
+                 6. Summary:
+                    - (1):xxx;
+                    - (2):xxx;
+                    - (3):xxx;
+                    - (4):xxx.
+                    
                  Be sure to use {} answers (proper nouns need to be marked in English), statements as concise and academic as possible, do not have too much repetitive information, numerical values using the original numbers, be sure to strictly follow the format, the corresponding content output to xxx, in accordance with \n line feed.                 
                  """.format(self.language, self.language, self.language)},
         ]
 
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages,
-        )
-        result = ''
-        for choice in response.choices:
-            result += choice.message.content
-        print("summary_result:\n", result)
-        print("prompt_token_used:", response.usage.prompt_tokens,
-              "completion_token_used:", response.usage.completion_tokens,
-              "total_token_used:", response.usage.total_tokens)
-        print("response_time:", response.response_ms / 1000.0, 's')
+        result, appendix = call_api(messages)
+        print(f"一、论文介绍({appendix}):\n", result)
         return result
 
     def export_to_markdown(self, text, file_name, mode='w'):
@@ -732,23 +693,44 @@ def chat_arxiv_main(args):
 
     reader1.summary_with_chat(paper_list=paper_list)
 
+def call_api(messages):
+    completion = openai_gpt4o(messages)
+    result = completion.choices[0].message.content
+    appendix = f"prompt={completion.usage.prompt_tokens}, completion={completion.usage.completion_tokens}, total={completion.usage.total_tokens}"
+    return re.compile(r'\n{2,}').sub('\n', result), appendix #匹配两个或更多连续的换行符，替换为一个换行符
+
+def openai_gpt4o(messages):
+    client = openai.OpenAI(api_key="sk-XXXXXXXXXXXXXXXXXXXX")
+    completion = client.chat.completions.create(
+        model="gpt-4o",
+        messages=messages
+    )
+    return completion
+
+def ali_qwen(messages):
+    client = openai.OpenAI(
+        api_key="sk-XXXXXXXXXXXXXXXXXXXX",
+        base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    completion = client.chat.completions.create(
+        model="qwen-long",
+        messages=messages
+    )
+    return completion
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--query", type=str, default='traffic flow prediction', help="the query string, ti: xx, au: xx, all: xx,")
-    parser.add_argument("--key_word", type=str, default='GPT robot', help="the key word of user research fields")
-    parser.add_argument("--page_num", type=int, default=2, help="the maximum number of page")
-    parser.add_argument("--max_results", type=int, default=3, help="the maximum number of results")
-    parser.add_argument("--days", type=int, default=10, help="the last days of arxiv papers of this query")
+    parser.add_argument("--query", type=str, default='LLM long context', help="the query string, ti: xx, au: xx, all: xx,")
+    parser.add_argument("--key_word", type=str, default='long context large language model', help="the key word of user research fields")
+    parser.add_argument("--page_num", type=int, default=10, help="the maximum number of page")
+    parser.add_argument("--max_results", type=int, default=10, help="the maximum number of results")
+    parser.add_argument("--days", type=int, default=540, help="the last days of arxiv papers of this query")
     parser.add_argument("--sort", type=str, default="web", help="another is LastUpdatedDate")
-    parser.add_argument("--save_image", default=False,
-                        help="save image? It takes a minute or two to save a picture! But pretty")
+    parser.add_argument("--save_image", default=False, help="save image? It takes a minute or two to save a picture! But pretty")
     parser.add_argument("--file_format", type=str, default='md', help="导出的文件格式，如果存图片的话，最好是md，如果不是的话，txt的不会乱")
     parser.add_argument("--language", type=str, default='zh', help="The other output lauguage is English, is en")
 
     arxiv_args = ArxivParams(**vars(parser.parse_args()))
-    import time
-
     start_time = time.time()
     chat_arxiv_main(args=arxiv_args)
     print("summary time:", time.time() - start_time)
